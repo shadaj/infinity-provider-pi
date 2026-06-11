@@ -1,0 +1,21 @@
+{
+  "name": "infinity-provider-pi",
+  "version": "0.1.0",
+  "description": "Infinity model provider process that proxies to pi built-in and installed model providers.",
+  "type": "module",
+  "bin": {
+    "infinity-provider-pi": "./src/main.js"
+  },
+  "scripts": {
+    "start": "node ./src/main.js",
+    "check": "node --check ./src/main.js"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "^0.75.5",
+    "@earendil-works/pi-coding-agent": "^0.75.4"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "license": "MIT"
+}
