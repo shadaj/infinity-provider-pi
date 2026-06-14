@@ -69,7 +69,7 @@ function modelKey(model) {
 function toModelEntry(model) {
   return {
     model_id: modelKey(model),
-    display_name: model.name ?? model.id,
+      display_name: `${model.name ?? model.id}${model.provider ? ` (${model.provider})` : ''}`,
     context_window: model.contextWindow ?? 128000,
     max_output_tokens: model.maxTokens ?? null,
   };
