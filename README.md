@@ -6,6 +6,7 @@ A standalone Infinity model provider that delegates model listing/invocation to 
 
 ```bash
 npm install
+npm run build
 ```
 
 ## Configure Infinity manually
@@ -15,7 +16,7 @@ This provider is not meant to be installed with `infinity provider install --cra
 ```json
 {
   "pi": {
-    "command": ["node", "/absolute/path/to/infinity-provider-pi/src/main.js"]
+    "command": ["node", "/absolute/path/to/infinity-provider-pi/dist/main.js"]
   }
 }
 ```

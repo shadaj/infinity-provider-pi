@@ -4,11 +4,14 @@
   "description": "Infinity model provider process that proxies to pi built-in and installed model providers.",
   "type": "module",
   "bin": {
-    "infinity-provider-pi": "./src/main.js"
+    "infinity-provider-pi": "./dist/main.js"
   },
   "scripts": {
-    "start": "node ./src/main.js",
-    "check": "node --check ./src/main.js"
+    "build": "tsc",
+    "start": "npm run build --silent && node ./dist/main.js",
+    "check": "tsc --noEmit",
+    "prepare": "npm run build",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.75.5",
@@ -17,5 +20,9 @@
   "engines": {
     "node": ">=22.19.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "typescript": "^6.0.3"
+  }
 }
