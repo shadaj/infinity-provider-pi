@@ -84,12 +84,6 @@ const wireItem = {
     reasoning: string,
     id: string | null = null,
   ): InfinityWireStreamItem => ({ ReasoningDelta: { id, reasoning } }),
-  reasoningSummary: (
-    summary: string,
-    id: string | null = null,
-  ): InfinityWireStreamItem => ({
-    Reasoning: { id, content: { type: "summary", content: summary } },
-  }),
   toolCall: ({
     id,
     name,
@@ -217,17 +211,37 @@ async function invokeModel(
   writeLine(providerResponse.streamEnd());
 }
 
-function eventToWireItems(event: AssistantMessageEvent): InfinityWireStreamItem[] {
+function eventToWireItems(
+  event: AssistantMessageEvent,
+): InfinityWireStreamItem[] {
   switch (event.type) {
     case "text_delta":
       return [wireItem.message(event.delta)];
     case "thinking_delta":
       return [wireItem.reasoningDelta(event.delta)];
     case "thinking_end":
-      // pi emits thinking_end with the completed content even after streaming
-      // thinking_delta events; Infinity/Rig can represent both the delta stream
-      // and the final non-delta reasoning block, so forward both.
-      return [wireItem.reasoningSummary(event.content)];
+      if (event.partial.content[event.contentIndex]!.type !== "thinking") {
+        throw new Error(
+          `pi assistant message event ${JSON.stringify(event)} content did not end with expected thinking content`,
+        );
+      }
+
+      return [
+        {
+          Reasoning: {
+            id: null,
+            content: {
+              type: "text",
+              content: {
+                text: event.content,
+                signature:
+                  (event.partial.content[event.contentIndex] as ThinkingContent)
+                    .thinkingSignature ?? null,
+              },
+            },
+          },
+        },
+      ];
     case "toolcall_end":
       return [wireItem.toolCall(event.toolCall)];
     case "done":
@@ -281,7 +295,9 @@ function wireCompletionRequestToPiContext(
     if (converted) messages.push(converted);
   }
   if (request.documents.length > 0) {
-    throw new Error("Infinity request documents are not yet supported by this provider");
+    throw new Error(
+      "Infinity request documents are not yet supported by this provider",
+    );
   }
   const context: Context = {
     messages,
@@ -297,15 +313,21 @@ function wireMessageToPiMessage(
 ): PiMessage {
   if (message.role === "user") {
     const parts = asMany(message.content);
-    if (parts.length === 0) throw new Error("Infinity user message content must not be empty");
+    if (parts.length === 0)
+      throw new Error("Infinity user message content must not be empty");
 
     const toolResults = parts.filter((part) => part.type === "toolresult");
     if (toolResults.length > 0) {
       if (parts.length !== 1) {
-        throw new Error("Infinity tool result content cannot be mixed with other user content in one pi message");
+        throw new Error(
+          "Infinity tool result content cannot be mixed with other user content in one pi message",
+        );
       }
       const toolResult = toolResults[0];
-      if (!toolResult) throw new Error("internal error: expected one Infinity tool result content part");
+      if (!toolResult)
+        throw new Error(
+          "internal error: expected one Infinity tool result content part",
+        );
       return toolResultToPiMessage(toolResult, toolCallNames);
     }
 
@@ -327,7 +349,9 @@ function wireMessageToPiMessage(
     provider: "infinity",
     model: "history",
     usage: emptyUsage(),
-    stopReason: content.some((block) => block.type === "toolCall") ? "toolUse" : "stop",
+    stopReason: content.some((block) => block.type === "toolCall")
+      ? "toolUse"
+      : "stop",
     timestamp: Date.now(),
   };
 }
@@ -349,7 +373,9 @@ function assistantContentToPi(
   return blocks;
 }
 
-function userNonToolContentToPi(part: InfinityUserContent): TextContent | ImageContent {
+function userNonToolContentToPi(
+  part: InfinityUserContent,
+): TextContent | ImageContent {
   switch (part.type) {
     case "text":
       return { type: "text", text: part.text };
@@ -357,11 +383,15 @@ function userNonToolContentToPi(part: InfinityUserContent): TextContent | ImageC
       return mediaContentToPiImage(part);
     case "audio":
     case "video":
-      throw new Error(`Infinity user ${part.type} content is not supported by pi`);
+      throw new Error(
+        `Infinity user ${part.type} content is not supported by pi`,
+      );
     case "document":
       return { type: "text", text: documentContentToPiText(part) };
     case "toolresult":
-      throw new Error("internal error: tool result reached non-tool user content conversion");
+      throw new Error(
+        "internal error: tool result reached non-tool user content conversion",
+      );
   }
 }
 
@@ -392,7 +422,10 @@ function reasoningToPi(value: InfinityReasoningBlock): ThinkingContent {
     type: "thinking",
     thinking: block.content.text,
   };
-  if (block.content.signature !== undefined && block.content.signature !== null) {
+  if (
+    block.content.signature !== undefined &&
+    block.content.signature !== null
+  ) {
     thinking.thinkingSignature = block.content.signature;
   }
   return thinking;
@@ -517,7 +550,8 @@ function emptyUsage(): Usage {
 function parseRequest(line: string): InfinityProviderRequest {
   const parsed = JSON.parse(line) as InfinityProviderRequest;
   if (parsed === "ListModels") return parsed;
-  if (typeof parsed === "object" && parsed !== null && "InvokeModel" in parsed) return parsed;
+  if (typeof parsed === "object" && parsed !== null && "InvokeModel" in parsed)
+    return parsed;
   throw new Error(`unknown provider request: ${line}`);
 }
 
@@ -545,7 +579,11 @@ function handleConnection(socket: net.Socket): void {
       if (request === "ListModels") {
         writeLine(providerResponse.models(await listModels()));
       } else {
-        await invokeModel(request.InvokeModel.model_id, request.InvokeModel.request, writeLine);
+        await invokeModel(
+          request.InvokeModel.model_id,
+          request.InvokeModel.request,
+          writeLine,
+        );
       }
     } catch (error) {
       writeLine(providerResponse.error(errorMessage(error)));
