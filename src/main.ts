@@ -148,7 +148,7 @@ async function listModels(): Promise<InfinityModelEntry[]> {
     process.env.PI_INFINITY_INCLUDE_UNAVAILABLE === "1";
   const models = includeUnavailable
     ? modelRegistry.getAll()
-    : await modelRegistry.getAvailable();
+    : modelRegistry.getAvailable();
   return models.map(toModelEntry);
 }
 
@@ -266,7 +266,7 @@ function getReasoningLevel(
     request.additional_params?.thinkingLevel ??
     request.additional_params?.thinking_level ??
     process.env.PI_INFINITY_THINKING_LEVEL ??
-    "medium";
+    "high";
 
   if (requested === false || requested === "off" || requested === "none")
     return undefined;
