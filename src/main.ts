@@ -109,11 +109,21 @@ const wireItem = {
 };
 
 function toRigUsage(usage: Usage): InfinityRigUsage {
+  // pi-ai keeps billable uncached input separate from cache reads/writes,
+  // while rig's `input_tokens` represents the full prompt/context size.
+  // Infinity's live context meter is based on `input_tokens`, so report the
+  // full prompt tokens here instead of only the uncached portion.
+  const cachedInputTokens = usage.cacheRead;
+  const promptCacheTokens = usage.cacheRead + usage.cacheWrite;
+  const componentTotalTokens = usage.input + usage.output + promptCacheTokens;
+  const totalTokens = usage.totalTokens || componentTotalTokens;
+  const inputTokens = usage.input + promptCacheTokens;
+
   return {
-    input_tokens: usage.input,
+    input_tokens: inputTokens,
     output_tokens: usage.output,
-    total_tokens: usage.totalTokens,
-    cached_input_tokens: usage.cacheRead,
+    total_tokens: totalTokens,
+    cached_input_tokens: cachedInputTokens,
   };
 }
 
