@@ -138,7 +138,7 @@ export interface InfinityToolDefinition {
 export type InfinityWireStreamItem =
   | { Message: string }
   | { ToolCall: InfinityWireToolCall }
-  | { ToolCallDelta: unknown }
+  | { ToolCallDelta: InfinityWireToolCallDelta }
   | { Reasoning: { id: string | null; content: InfinityReasoningContent } }
   | { ReasoningDelta: { id: string | null; reasoning: string } }
   | { Final: { usage: InfinityRigUsage | null } }
@@ -153,6 +153,17 @@ export interface InfinityWireToolCall {
   signature: string | null;
   additional_params: unknown | null;
 }
+
+export interface InfinityWireToolCallDelta {
+  id: string;
+  internal_call_id: string;
+  content: InfinityToolCallDeltaContent;
+}
+
+// rig::streaming::ToolCallDeltaContent uses serde's default externally-tagged enum shape.
+export type InfinityToolCallDeltaContent =
+  | { Name: string }
+  | { Delta: string };
 
 export interface InfinityRigUsage {
   input_tokens: number;

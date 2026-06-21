@@ -100,6 +100,23 @@ const wireItem = {
       additional_params: null,
     },
   }),
+  toolCallNameDelta: ({ id, name }: PiToolCall): InfinityWireStreamItem => ({
+    ToolCallDelta: {
+      id,
+      internal_call_id: id,
+      content: { Name: name },
+    },
+  }),
+  toolCallArgumentDelta: (
+    { id }: PiToolCall,
+    delta: string,
+  ): InfinityWireStreamItem => ({
+    ToolCallDelta: {
+      id,
+      internal_call_id: id,
+      content: { Delta: delta },
+    },
+  }),
   final: (usage?: Usage | null): InfinityWireStreamItem => ({
     Final: { usage: usage ? toRigUsage(usage) : null },
   }),
@@ -209,9 +226,10 @@ async function invokeModel(
   }
 
   writeLine(providerResponse.invokeStarted());
+  const eventTranslationState = createEventTranslationState();
   try {
     for await (const event of stream) {
-      for (const item of eventToWireItems(event)) {
+      for (const item of eventToWireItems(event, eventTranslationState)) {
         writeLine(providerResponse.chunk(item));
       }
     }
@@ -221,8 +239,17 @@ async function invokeModel(
   writeLine(providerResponse.streamEnd());
 }
 
+interface EventTranslationState {
+  toolCallNamesSentByContentIndex: Map<number, string>;
+}
+
+function createEventTranslationState(): EventTranslationState {
+  return { toolCallNamesSentByContentIndex: new Map() };
+}
+
 function eventToWireItems(
   event: AssistantMessageEvent,
+  state: EventTranslationState,
 ): InfinityWireStreamItem[] {
   switch (event.type) {
     case "text_delta":
@@ -252,6 +279,16 @@ function eventToWireItems(
           },
         },
       ];
+    case "toolcall_start":
+      return maybeToolCallNameDelta(event, state);
+    case "toolcall_delta": {
+      const toolCall = partialToolCall(event);
+      const items = maybeToolCallNameDelta(event, state);
+      if (event.delta.length > 0) {
+        items.push(wireItem.toolCallArgumentDelta(toolCall, event.delta));
+      }
+      return items;
+    }
     case "toolcall_end":
       return [wireItem.toolCall(event.toolCall)];
     case "done":
@@ -263,6 +300,36 @@ function eventToWireItems(
     default:
       return [];
   }
+}
+
+function partialToolCall(event: {
+  type: string;
+  contentIndex: number;
+  partial: AssistantMessage;
+}): PiToolCall {
+  const block = event.partial.content[event.contentIndex];
+  if (!block || block.type !== "toolCall") {
+    throw new Error(
+      `pi assistant message event ${JSON.stringify(event)} content did not reference expected tool call content`,
+    );
+  }
+  return block;
+}
+
+function maybeToolCallNameDelta(
+  event: { type: string; contentIndex: number; partial: AssistantMessage },
+  state: EventTranslationState,
+): InfinityWireStreamItem[] {
+  const toolCall = partialToolCall(event);
+  if (toolCall.name.length === 0) return [];
+
+  const previousName = state.toolCallNamesSentByContentIndex.get(
+    event.contentIndex,
+  );
+  if (previousName === toolCall.name) return [];
+
+  state.toolCallNamesSentByContentIndex.set(event.contentIndex, toolCall.name);
+  return [wireItem.toolCallNameDelta(toolCall)];
 }
 
 function getReasoningLevel(
